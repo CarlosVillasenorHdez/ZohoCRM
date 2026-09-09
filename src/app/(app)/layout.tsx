@@ -1,46 +1,50 @@
-import Link from "next/link";
 import { salir } from "@/app/login/actions";
 import { asesorActual } from "@/lib/supabase/server";
 import { esAdministrador, adminConfigurado } from "@/lib/supabase/admin";
-
-const NAV = [
-  { href: "/panel", texto: "Hoy" },
-  { href: "/embudo", texto: "Embudo" },
-  { href: "/contactos", texto: "Contactos" },
-  { href: "/agenda", texto: "Agenda" },
-];
+import { Lateral, Pestanas, type Destino } from "@/components/nav";
+import {
+  IconoHoy, IconoEmbudo, IconoContactos, IconoAgenda, IconoUsuarios,
+} from "@/components/iconos";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const actual = await asesorActual();
-  const mostrarAdmin = adminConfigurado() && esAdministrador(actual?.email);
+  const admin = adminConfigurado() && esAdministrador(actual?.email);
+
+  const destinos: Destino[] = [
+    { href: "/panel", texto: "Hoy", icono: <IconoHoy /> },
+    { href: "/embudo", texto: "Embudo", icono: <IconoEmbudo /> },
+    { href: "/contactos", texto: "Contactos", icono: <IconoContactos /> },
+    { href: "/agenda", texto: "Agenda", icono: <IconoAgenda /> },
+    ...(admin ? [{ href: "/admin/usuarios", texto: "Usuarios", icono: <IconoUsuarios /> }] : []),
+  ];
+
+  const pie = (
+    <form action={salir}>
+      <p className="truncate text-xs text-tinta-suave">{actual?.email}</p>
+      <button type="submit" className="mt-1.5 text-sm text-tinta-suave hover:text-tinta">
+        Salir
+      </button>
+    </form>
+  );
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 pb-24 pt-6 sm:px-8">
-      <header className="mb-7 border-b border-linea pb-3">
-        <div className="flex items-baseline justify-between">
-          <Link href="/panel" className="text-lg font-semibold tracking-tight">
-            Cartera
-          </Link>
-          <form action={salir}>
-            <button type="submit" className="text-sm text-tinta-suave hover:text-tinta">
-              Salir
-            </button>
-          </form>
-        </div>
-        <nav className="mt-3 flex gap-5">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="text-sm text-tinta-suave hover:text-tinta">
-              {n.texto}
-            </Link>
-          ))}
-          {mostrarAdmin && (
-            <Link href="/admin/usuarios" className="text-sm text-tinta-suave hover:text-tinta">
-              Usuarios
-            </Link>
-          )}
-        </nav>
+    <div className="lg:flex">
+      <Lateral destinos={destinos} pie={pie} />
+
+      <header className="flex items-baseline justify-between border-b border-linea px-5 py-4 lg:hidden">
+        <span className="text-lg font-semibold tracking-tight">Cartera</span>
+        <form action={salir}>
+          <button type="submit" className="text-sm text-tinta-suave">Salir</button>
+        </form>
       </header>
-      {children}
+
+      <div className="min-w-0 flex-1">
+        <div className="mx-auto w-full max-w-5xl px-5 pb-28 pt-6 sm:px-8 lg:py-10">
+          {children}
+        </div>
+      </div>
+
+      <Pestanas destinos={destinos} />
     </div>
   );
 }

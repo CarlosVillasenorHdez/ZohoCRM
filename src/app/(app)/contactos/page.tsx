@@ -39,10 +39,10 @@ export default async function Contactos() {
         </p>
       )}
 
-      <ul className="mt-6 divide-y divide-linea">
+      <ul className="mt-6 divide-y divide-linea lg:grid lg:grid-cols-2 lg:gap-x-10 lg:divide-y-0">
         {contactos.map((c) => (
           <li key={c.id}>
-            <Link href={`/contactos/${c.id}`} className="flex items-baseline justify-between py-3">
+            <Link href={`/contactos/${c.id}`} className="flex items-baseline justify-between border-b border-linea py-3">
               <span className="font-medium">
                 {[c.nombre, c.apellido_paterno].filter(Boolean).join(" ")}
               </span>

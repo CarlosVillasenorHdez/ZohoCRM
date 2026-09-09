@@ -76,3 +76,52 @@ export function ahoraLocalInput(): string {
   const g = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
   return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
 }
+
+// ---------------------------------------------------------------- calendario
+
+export function mesActualISO(): string {
+  return hoyISO().slice(0, 7);
+}
+
+export function nombreMes(mesISO: string): string {
+  const [a, m] = mesISO.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(Date.UTC(a ?? 1970, (m ?? 1) - 1, 1)));
+}
+
+export function mesVecino(mesISO: string, delta: number): string {
+  const [a, m] = mesISO.split("-").map(Number);
+  const d = new Date(Date.UTC(a ?? 1970, (m ?? 1) - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Rejilla de 6 semanas que empieza en lunes, con los días de relleno del mes
+ * anterior y siguiente. Devuelve fechas 'YYYY-MM-DD'.
+ */
+export function rejillaMes(mesISO: string): { iso: string; delMes: boolean }[] {
+  const [a, m] = mesISO.split("-").map(Number);
+  const anio = a ?? 1970;
+  const mes = (m ?? 1) - 1;
+
+  const primero = new Date(Date.UTC(anio, mes, 1));
+  // getUTCDay: 0 = domingo. Queremos lunes como primer día.
+  const corrimiento = (primero.getUTCDay() + 6) % 7;
+
+  const celdas: { iso: string; delMes: boolean }[] = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(Date.UTC(anio, mes, 1 - corrimiento + i));
+    celdas.push({
+      iso: d.toISOString().slice(0, 10),
+      delMes: d.getUTCMonth() === mes,
+    });
+  }
+  return celdas;
+}
+
+export function diaDelMes(iso: string): number {
+  return Number(iso.slice(8, 10));
+}

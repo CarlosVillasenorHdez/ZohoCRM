@@ -123,6 +123,21 @@ export async function crearOportunidad(_p: Estado, d: FormData): Promise<Estado>
   return { ok: true, mensaje: "Oportunidad creada." };
 }
 
+/** Para arrastrar y soltar: recibe valores directos, no FormData. */
+export async function moverOportunidad(id: string, etapa: Etapa): Promise<void> {
+  const { asesor, supabase } = await sesion();
+  await escribir(
+    "mover oportunidad",
+    supabase
+      .from("oportunidades")
+      .update({ etapa })
+      .eq("id", id)
+      .eq("asesor_id", asesor.id)
+      .select("id"),
+  );
+  revalidatePath("/embudo");
+}
+
 export async function moverEtapa(d: FormData): Promise<void> {
   const id = String(d.get("id"));
   const etapa = String(d.get("etapa")) as Etapa;

@@ -60,3 +60,32 @@ describe("fechaCorta", () => {
     expect(fechaCorta("2026-01-01")).toMatch(/01/);
   });
 });
+
+describe("rejillaMes", () => {
+  it("siempre devuelve 42 celdas", async () => {
+    const { rejillaMes } = await import("./fechas");
+    expect(rejillaMes("2026-09")).toHaveLength(42);
+    expect(rejillaMes("2026-02")).toHaveLength(42);
+  });
+
+  it("empieza en lunes", async () => {
+    const { rejillaMes } = await import("./fechas");
+    // 1 de septiembre de 2026 es martes, así que la rejilla abre el lunes 31 de agosto.
+    expect(rejillaMes("2026-09")[0]?.iso).toBe("2026-08-31");
+  });
+
+  it("marca cuáles celdas son del mes pedido", async () => {
+    const { rejillaMes } = await import("./fechas");
+    const c = rejillaMes("2026-09");
+    expect(c[0]?.delMes).toBe(false);
+    expect(c.filter((x) => x.delMes)).toHaveLength(30);
+  });
+});
+
+describe("mesVecino", () => {
+  it("cruza el fin de año en ambos sentidos", async () => {
+    const { mesVecino } = await import("./fechas");
+    expect(mesVecino("2026-12", 1)).toBe("2027-01");
+    expect(mesVecino("2026-01", -1)).toBe("2025-12");
+  });
+});

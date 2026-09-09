@@ -3,11 +3,23 @@
 import { crearActividad } from "@/lib/db/mutaciones";
 import { Formulario, Campo, Selector, AreaTexto } from "@/components/ui";
 
-export function FormularioRapido({ contactos }: { contactos: { id: string; nombre: string }[] }) {
+export function FormularioRapido({
+  contactos,
+  diaSugerido,
+}: {
+  contactos: { id: string; nombre: string }[];
+  diaSugerido?: string;
+}) {
   return (
     <Formulario accion={crearActividad} boton="Agendar">
       <Campo etiqueta="Qué vas a hacer" nombre="titulo" requerido />
-      <Campo etiqueta="Cuándo" nombre="inicia_en" tipo="datetime-local" requerido />
+      <Campo
+        etiqueta="Cuándo"
+        nombre="inicia_en"
+        tipo="datetime-local"
+        requerido
+        valor={diaSugerido ? `${diaSugerido}T09:00` : undefined}
+      />
       <Selector
         etiqueta="Tipo"
         nombre="tipo"
