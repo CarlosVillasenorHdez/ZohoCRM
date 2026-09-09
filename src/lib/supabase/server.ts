@@ -31,10 +31,24 @@ export async function clienteServidor() {
   });
 }
 
-/** Devuelve el asesor autenticado, o null. */
+/**
+ * Devuelve el asesor autenticado, o null.
+ *
+ * Nunca lanza. Un fallo de configuración o de red aquí debe mandar al login,
+ * no tumbar la página con un 500 que no le dice nada a nadie. El motivo real
+ * queda en los logs del servidor.
+ */
 export async function asesorActual() {
-  const supabase = await clienteServidor();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return data.user;
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) return null;
+    return data.user;
+  } catch (causa) {
+    console.error(
+      "[auth] no se pudo verificar la sesión:",
+      causa instanceof Error ? causa.message : causa,
+    );
+    return null;
+  }
 }
