@@ -1,30 +1,45 @@
-const ZONA = "America/Mexico_City";
+export const ZONA = "America/Mexico_City";
 
-export function hoyEnMexico(): Date {
-  const ahora = new Date();
-  const partes = new Intl.DateTimeFormat("en-CA", {
+/** 'YYYY-MM-DD' del día actual EN MÉXICO, sin importar la zona del servidor. */
+export function hoyISO(): string {
+  return new Intl.DateTimeFormat("en-CA", {
     timeZone: ZONA,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(ahora);
-  return new Date(`${partes}T00:00:00`);
+  }).format(new Date());
 }
 
-export function fechaLarga(d: Date = hoyEnMexico()): string {
+/**
+ * Formatea una fecha civil ('YYYY-MM-DD') sin volver a convertir zonas.
+ *
+ * El bug que esto evita: construir un Date y luego formatearlo con
+ * timeZone: 'America/Mexico_City' aplica el desfase DOS veces cuando el
+ * servidor corre en UTC, y muestra el día anterior. En Vercel eso pasaba
+ * siempre, y el panel decía "martes 8" un miércoles 9.
+ */
+export function fechaLarga(iso: string = hoyISO()): string {
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const utc = new Date(Date.UTC(a ?? 1970, (m ?? 1) - 1, d ?? 1));
   return new Intl.DateTimeFormat("es-MX", {
-    timeZone: ZONA,
+    timeZone: "UTC",
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(d);
+  }).format(utc);
 }
 
 export function fechaCorta(iso: string): string {
-  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
-  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" }).format(d);
+  const [a, m, d] = iso.slice(0, 10).split("-").map(Number);
+  const utc = new Date(Date.UTC(a ?? 1970, (m ?? 1) - 1, d ?? 1));
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "short",
+  }).format(utc);
 }
 
+/** Hora de un timestamp completo, sí en zona de México. */
 export function hora(iso: string): string {
   return new Intl.DateTimeFormat("es-MX", {
     timeZone: ZONA,
@@ -34,11 +49,13 @@ export function hora(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** Días de diferencia contra hoy. Negativo = ya pasó. */
+/** Días de diferencia contra hoy en México. Negativo = ya pasó. */
 export function diasDesdeHoy(iso: string): number {
-  const objetivo = new Date(`${iso.slice(0, 10)}T00:00:00`);
-  const ms = objetivo.getTime() - hoyEnMexico().getTime();
-  return Math.round(ms / 86_400_000);
+  const dia = (s: string) => {
+    const [a, m, d] = s.slice(0, 10).split("-").map(Number);
+    return Date.UTC(a ?? 1970, (m ?? 1) - 1, d ?? 1);
+  };
+  return Math.round((dia(iso) - dia(hoyISO())) / 86_400_000);
 }
 
 export function retraso(dias: number): string {
@@ -47,4 +64,15 @@ export function retraso(dias: number): string {
   if (dias === -1) return "ayer";
   if (dias < 0) return `hace ${Math.abs(dias)} días`;
   return `en ${dias} días`;
+}
+
+/** Valor por defecto para <input type="datetime-local"> */
+export function ahoraLocalInput(): string {
+  const p = new Intl.DateTimeFormat("en-CA", {
+    timeZone: ZONA,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "00";
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
 }
