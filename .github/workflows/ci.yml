@@ -22,5 +22,5 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ejemplo.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci
+          SUPABASE_URL: https://ejemplo.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci

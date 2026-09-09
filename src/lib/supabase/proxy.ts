@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { leerConfig } from "./env";
 
 type CookieNueva = { name: string; value: string; options: CookieOptions };
 
@@ -18,16 +19,13 @@ const RUTAS_PUBLICAS = ["/login", "/auth", "/estado"];
  *   const asesor = await asesorActual(); if (!asesor) redirect("/login");
  */
 export async function verificarSesion(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const llave = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const { url, llave } = leerConfig();
 
   if (!url || !llave) {
     console.error(
       "[proxy] Faltan variables de entorno. " +
-        `NEXT_PUBLIC_SUPABASE_URL=${url ? "ok" : "AUSENTE"}, ` +
-        `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${llave ? "ok" : "AUSENTE"}. ` +
-        "Agrégalas en Vercel (Settings > Environment Variables) y vuelve a " +
-        "desplegar SIN caché de build: las NEXT_PUBLIC_ se incrustan al compilar.",
+        `url=${url ? "ok" : "AUSENTE"}, llave=${llave ? "ok" : "AUSENTE"}. ` +
+        "Define SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY en Vercel.",
     );
     return NextResponse.next({ request });
   }
