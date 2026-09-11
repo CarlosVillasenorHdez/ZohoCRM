@@ -1,18 +1,19 @@
 import { salir } from "@/app/login/actions";
 import { asesorActual } from "@/lib/supabase/server";
-import { esAdministrador, adminConfigurado } from "@/lib/supabase/admin";
+import { esSuperusuario } from "@/lib/supabase/admin";
 import { Lateral, Pestanas, type Destino } from "@/components/nav";
 import {
-  IconoHoy, IconoEmbudo, IconoContactos, IconoAgenda, IconoUsuarios,
+  IconoHoy, IconoEmbudo, IconoContactos, IconoAgenda, IconoUsuarios, IconoPolizas,
 } from "@/components/iconos";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
   const actual = await asesorActual();
-  const admin = adminConfigurado() && esAdministrador(actual?.email);
+  const admin = await esSuperusuario();
 
   const destinos: Destino[] = [
     { href: "/panel", texto: "Hoy", icono: <IconoHoy /> },
     { href: "/embudo", texto: "Embudo", icono: <IconoEmbudo /> },
+    { href: "/polizas", texto: "Cartera", icono: <IconoPolizas /> },
     { href: "/contactos", texto: "Contactos", icono: <IconoContactos /> },
     { href: "/agenda", texto: "Agenda", icono: <IconoAgenda /> },
     ...(admin ? [{ href: "/admin/usuarios", texto: "Usuarios", icono: <IconoUsuarios /> }] : []),

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { asesorActual, clienteServidor } from "@/lib/supabase/server";
-import { esAdministrador, adminConfigurado } from "@/lib/supabase/admin";
-import { FormularioUsuario } from "./formulario";
+import { asesorActual } from "@/lib/supabase/server";
+import { esSuperusuario, adminConfigurado } from "@/lib/supabase/admin";
+import { listarUsuarios } from "./acciones";
+import { PanelUsuarios } from "./panel";
 
 export const dynamic = "force-dynamic";
 
@@ -13,43 +14,50 @@ export default async function Usuarios() {
     return (
       <main>
         <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-        <p className="mt-4 text-tinta-suave">
-          Falta configurar esta pantalla. En Vercel agrega dos variables de servidor:
+        <p className="mt-4 max-w-prose text-tinta-suave">
+          Falta una variable de servidor para poder administrar cuentas desde aquí.
         </p>
-        <ul className="mt-4 space-y-2 text-sm">
-          <li className="border-l-2 border-l-linea pl-4">
-            <code>SUPABASE_SECRET_KEY</code> — de Supabase, Settings → API Keys → Secret keys.
-            Bypasea RLS: nunca con prefijo <code>NEXT_PUBLIC_</code>.
-          </li>
-          <li className="border-l-2 border-l-linea pl-4">
-            <code>ADMIN_EMAIL</code> — tu correo. Solo esa cuenta ve esta pantalla.
-          </li>
-        </ul>
+        <div className="mt-5 border-l-2 border-l-linea pl-4 text-sm">
+          <p>
+            En Vercel agrega <code className="cifras">SUPABASE_SECRET_KEY</code>, que sacas de
+            Supabase → Settings → API Keys → Secret keys.
+          </p>
+          <p className="mt-2 text-tinta-suave">
+            Bypasea RLS por completo: nunca con prefijo <code>NEXT_PUBLIC_</code>, nunca en el
+            repositorio.
+          </p>
+        </div>
       </main>
     );
   }
 
-  if (!esAdministrador(actual.email)) {
+  if (!(await esSuperusuario())) {
     return (
       <main>
         <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-        <p className="mt-4 text-tinta-suave">Esta pantalla es solo del administrador.</p>
+        <p className="mt-4 max-w-prose text-tinta-suave">
+          Esta pantalla es solo del superusuario. Si deberías serlo, corre en el SQL Editor de
+          Supabase:
+        </p>
+        <pre className="mt-4 overflow-x-auto rounded-md border border-linea bg-white p-4 text-sm">
+{`update asesores set es_super = true
+ where id = '${actual.id}';`}
+        </pre>
       </main>
     );
   }
 
-  const supabase = await clienteServidor();
-  const { data: yo } = await supabase.from("asesores").select("nombre, email").eq("id", actual.id).maybeSingle();
+  const usuarios = await listarUsuarios();
 
   return (
     <main>
       <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-      <p className="mt-1.5 text-tinta-suave">
-        Entraste como {yo?.nombre ?? actual.email}. Cada usuario nuevo es un asesor con su
-        cartera aislada: no ve nada de los demás.
+      <p className="mt-1.5 max-w-prose text-tinta-suave">
+        Cada usuario es un asesor con su cartera aislada. Tú administras las cuentas; no ves
+        sus contactos, sus pólizas ni sus comisiones.
       </p>
       <div className="mt-8">
-        <FormularioUsuario />
+        <PanelUsuarios usuarios={usuarios} />
       </div>
     </main>
   );

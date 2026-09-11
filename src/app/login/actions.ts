@@ -2,49 +2,54 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { clienteServidor } from "@/lib/supabase/server";
+import { aCorreoDeAcceso } from "@/lib/auth";
 
 export type EstadoLogin = { mensaje: string | null };
 
-export async function entrar(
-  _previo: EstadoLogin,
-  datos: FormData,
-): Promise<EstadoLogin> {
-  const email = String(datos.get("email") ?? "").trim();
+const COOKIE_ULTIMO = "cartera_ultimo_usuario";
+
+export async function ultimoUsuario(): Promise<string> {
+  const c = await cookies();
+  return c.get(COOKIE_ULTIMO)?.value ?? "";
+}
+
+export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<EstadoLogin> {
+  const usuario = String(datos.get("usuario") ?? "").trim();
   const password = String(datos.get("password") ?? "");
 
-  if (!email || !password) {
-    return { mensaje: "Escribe tu correo y tu contraseña." };
-  }
+  if (!usuario || !password) return { mensaje: "Escribe tu usuario y tu contraseña." };
 
-  // Este es el primer punto del flujo que exige la configuración de Supabase:
-  // /login renderiza sin ella y el proxy falla abierta. Si truena aquí sin
-  // atrapar, el usuario ve un 500 anónimo justo al intentar entrar.
   let error;
   try {
     const supabase = await clienteServidor();
-    ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+    ({ error } = await supabase.auth.signInWithPassword({
+      email: aCorreoDeAcceso(usuario),
+      password,
+    }));
   } catch (causa) {
-    console.error(
-      "[login] no se pudo construir el cliente de Supabase:",
-      causa instanceof Error ? causa.message : causa,
-    );
-    return {
-      mensaje:
-        "El servidor no tiene la configuración de Supabase. Abre /estado para ver qué falta.",
-    };
+    console.error("[login] configuración:", causa instanceof Error ? causa.message : causa);
+    return { mensaje: "El servidor no tiene la configuración de Supabase. Revisa /estado." };
   }
 
   if (error) {
-    console.error("[login] fallo de autenticación:", error.message, error.code);
+    console.error("[login] fallo:", error.message, error.code);
     if (error.code === "email_not_confirmed") {
-      return {
-        mensaje:
-          "Ese usuario no está confirmado. En Supabase, edítalo y marca Auto Confirm User.",
-      };
+      return { mensaje: "Esa cuenta no está confirmada. Pídele al administrador que la active." };
     }
-    return { mensaje: "Ese correo y esa contraseña no coinciden." };
+    return { mensaje: "Ese usuario y esa contraseña no coinciden." };
   }
+
+  // Se recuerda el usuario, nunca la contraseña, para no volver a teclearlo.
+  const c = await cookies();
+  c.set(COOKIE_ULTIMO, usuario.toLowerCase(), {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: true,
+    maxAge: 60 * 60 * 24 * 365,
+    path: "/",
+  });
 
   revalidatePath("/", "layout");
   redirect("/panel");

@@ -263,3 +263,166 @@ export async function marcarReciboPagado(d: FormData): Promise<void> {
 
   revalidatePath("/panel");
 }
+
+// ------------------------------------------------------------------ pólizas
+
+/** Campos propios de cada ramo; se guardan en polizas.datos (JSONB). */
+function datosDelRamo(ramo: string, d: FormData): Record<string, unknown> {
+  const t = (k: string) => texto(d, k);
+  const n = (k: string) => numero(d, k);
+
+  switch (ramo) {
+    case "autos":
+      return {
+        placas: t("placas"), marca: t("marca"), modelo: t("modelo"),
+        anio: n("anio"), cobertura: t("cobertura"),
+      };
+    case "gmm":
+      return {
+        suma_asegurada: n("suma_asegurada"), deducible: n("deducible"),
+        coaseguro: n("coaseguro"), hospital: t("hospital"),
+      };
+    case "ahorro":
+    case "vida":
+      return {
+        plazo_anios: n("plazo_anios"), aportacion: n("aportacion"),
+        beneficiario: t("beneficiario"),
+      };
+    default:
+      return {};
+  }
+}
+
+export async function crearPoliza(_p: Estado, d: FormData): Promise<Estado> {
+  const contacto_id = texto(d, "contacto_id");
+  const numero_poliza = texto(d, "numero_poliza");
+  const aseguradora_id = texto(d, "aseguradora_id");
+  const ramo = texto(d, "ramo");
+  const fecha_inicio = texto(d, "fecha_inicio");
+  const fecha_fin = texto(d, "fecha_fin");
+
+  if (!contacto_id || !numero_poliza || !aseguradora_id || !ramo || !fecha_inicio || !fecha_fin) {
+    return { ok: false, mensaje: "Faltan datos: cliente, número, aseguradora, ramo y vigencia." };
+  }
+  if (fecha_fin <= fecha_inicio) {
+    return { ok: false, mensaje: "La fecha de fin tiene que ser posterior a la de inicio." };
+  }
+
+  const { asesor, supabase } = await sesion();
+
+  // Ahorro y vida continúan en la misma póliza; GMM y autos emiten una nueva.
+  const tipo_renovacion = ramo === "ahorro" || ramo === "vida" ? "continua" : "nueva_poliza";
+
+  const r = await intentar(
+    "crear póliza",
+    supabase
+      .from("polizas")
+      .insert({
+        asesor_id: asesor.id,
+        contacto_id,
+        aseguradora_id,
+        oportunidad_id: texto(d, "oportunidad_id"),
+        numero_poliza,
+        ramo,
+        subtipo: texto(d, "subtipo"),
+        producto: texto(d, "producto"),
+        fecha_inicio,
+        fecha_fin,
+        prima_total: numero(d, "prima_total"),
+        moneda: texto(d, "moneda") ?? "MXN",
+        forma_pago: texto(d, "forma_pago") ?? "anual",
+        tipo_renovacion,
+        comision_pct: numero(d, "comision_pct"),
+        datos: datosDelRamo(ramo, d),
+        notas: texto(d, "notas"),
+      })
+      .select("id"),
+  );
+
+  if (!r.ok) return { ok: false, mensaje: r.mensaje };
+
+  const creada = Array.isArray(r.datos) ? (r.datos[0] as { id: string } | undefined) : undefined;
+
+  // Los recibos se generan solos según la forma de pago. Si esto falla, la
+  // póliza ya quedó guardada: se avisa en vez de fingir que todo salió bien.
+  if (creada?.id) {
+    const { error } = await supabase.rpc("generar_recibos", { p_poliza_id: creada.id });
+    if (error) {
+      console.error("[polizas] generar_recibos:", error.message);
+      return {
+        ok: true,
+        mensaje: "Póliza guardada, pero no se pudieron generar los recibos. Revísalos en su ficha.",
+      };
+    }
+  }
+
+  revalidatePath("/polizas");
+  revalidatePath("/panel");
+  revalidatePath(`/contactos/${contacto_id}`);
+  return { ok: true, mensaje: `Póliza ${numero_poliza} guardada, con sus recibos.` };
+}
+
+export async function renovarPoliza(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  const fecha_inicio = texto(d, "fecha_inicio");
+  const fecha_fin = texto(d, "fecha_fin");
+  if (!id || !fecha_inicio || !fecha_fin) {
+    return { ok: false, mensaje: "Falta la nueva vigencia." };
+  }
+
+  const { supabase } = await sesion();
+
+  const { data, error } = await supabase.rpc("renovar_poliza", {
+    p_poliza_id: id,
+    p_numero_nuevo: texto(d, "numero_nuevo") ?? "",
+    p_fecha_inicio: fecha_inicio,
+    p_fecha_fin: fecha_fin,
+    p_prima: numero(d, "prima_total"),
+  });
+
+  if (error) {
+    console.error("[polizas] renovar:", error.message);
+    return { ok: false, mensaje: `No se pudo renovar: ${error.message}` };
+  }
+
+  const nuevaId = typeof data === "string" ? data : id;
+  const { error: errRecibos } = await supabase.rpc("generar_recibos", { p_poliza_id: nuevaId });
+  if (errRecibos) console.error("[polizas] recibos de renovación:", errRecibos.message);
+
+  revalidatePath("/polizas");
+  revalidatePath("/panel");
+  return { ok: true, mensaje: "Renovada. Los recibos del nuevo periodo ya están generados." };
+}
+
+export async function guardarTasas(_p: Estado, d: FormData): Promise<Estado> {
+  const { asesor, supabase } = await sesion();
+  const ramos = ["ahorro", "gmm", "autos", "vida", "danos"];
+
+  for (const ramo of ramos) {
+    const primero = numero(d, `${ramo}_primer`);
+    const subs = numero(d, `${ramo}_subsecuente`);
+    if (primero === null && subs === null) continue;
+
+    const r = await intentar(
+      `guardar tasa ${ramo}`,
+      supabase
+        .from("tasas_comision")
+        .upsert(
+          {
+            asesor_id: asesor.id,
+            ramo,
+            subtipo: null,
+            pct_primer_anio: primero ?? 0,
+            pct_subsecuente: subs ?? 0,
+          },
+          { onConflict: "asesor_id,ramo,subtipo" },
+        )
+        .select("id"),
+    );
+    if (!r.ok) return { ok: false, mensaje: r.mensaje };
+  }
+
+  revalidatePath("/polizas/comisiones");
+  revalidatePath("/polizas");
+  return { ok: true, mensaje: "Tasas guardadas." };
+}

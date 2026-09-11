@@ -25,6 +25,12 @@ export function PanelAcciones({ contactoId, nombre }: { contactoId: string; nomb
         >
           Agendar seguimiento
         </button>
+        <a
+          href={`/polizas/nueva?contacto=${contactoId}`}
+          className="rounded-md border border-linea px-4 py-2.5 font-medium"
+        >
+          Capturar póliza
+        </a>
       </div>
     );
   }

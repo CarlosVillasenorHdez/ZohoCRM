@@ -24,3 +24,6 @@ export const IconoAgenda = () => (
 export const IconoUsuarios = () => (
   <svg {...base} aria-hidden><circle cx="9" cy="9" r="3" /><path d="M3 19c.8-3.2 3-5 6-5s5.2 1.8 6 5M16 7.5a3 3 0 010 5.5" /></svg>
 );
+export const IconoPolizas = () => (
+  <svg {...base} aria-hidden><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9 13h6M9 16.5h4" /></svg>
+);
