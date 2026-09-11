@@ -1,10 +1,11 @@
 import { FormularioLogin } from "./formulario";
 import { ultimoUsuario } from "./actions";
+import { usuariosParaAcceso } from "@/lib/db/acceso";
 
 export const dynamic = "force-dynamic";
 
 export default async function Login() {
-  const ultimo = await ultimoUsuario();
+  const [ultimo, usuarios] = await Promise.all([ultimoUsuario(), usuariosParaAcceso()]);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-12">
@@ -14,7 +15,7 @@ export default async function Login() {
           Tus citas, seguimientos y renovaciones del día.
         </p>
       </div>
-      <FormularioLogin ultimoUsuario={ultimo} />
+      <FormularioLogin ultimoUsuario={ultimo} usuarios={usuarios} />
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { salir } from "@/app/login/actions";
 import { asesorActual } from "@/lib/supabase/server";
 import { esSuperusuario } from "@/lib/supabase/admin";
@@ -20,12 +21,16 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   ];
 
   const pie = (
-    <form action={salir}>
-      <p className="truncate text-xs text-tinta-suave">{actual?.email}</p>
-      <button type="submit" className="mt-1.5 text-sm text-tinta-suave hover:text-tinta">
-        Salir
-      </button>
-    </form>
+    <div>
+      <Link href="/perfil" className="block truncate text-sm text-tinta-suave hover:text-tinta">
+        Mi cuenta
+      </Link>
+      <form action={salir}>
+        <button type="submit" className="mt-1.5 text-sm text-tinta-suave hover:text-tinta">
+          Salir
+        </button>
+      </form>
+    </div>
   );
 
   return (
@@ -34,9 +39,12 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
 
       <header className="flex items-baseline justify-between border-b border-linea px-5 py-4 lg:hidden">
         <span className="text-lg font-semibold tracking-tight">Cartera</span>
-        <form action={salir}>
-          <button type="submit" className="text-sm text-tinta-suave">Salir</button>
-        </form>
+        <div className="flex gap-5">
+          <Link href="/perfil" className="text-sm text-tinta-suave">Mi cuenta</Link>
+          <form action={salir}>
+            <button type="submit" className="text-sm text-tinta-suave">Salir</button>
+          </form>
+        </div>
       </header>
 
       <div className="min-w-0 flex-1">
