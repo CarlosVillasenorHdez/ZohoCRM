@@ -44,7 +44,7 @@ export default async function Perfil() {
       )}
 
       <div className="mt-8 max-w-md">
-        <FormulariosPerfil usuarioActual={usuario} />
+        <FormulariosPerfil usuarioActual={usuario} nombreActual={perfil?.nombre ?? ""} />
       </div>
     </main>
   );

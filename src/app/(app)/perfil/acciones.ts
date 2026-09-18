@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { clienteServidor, asesorActual } from "@/lib/supabase/server";
 import { clienteAdmin, adminConfigurado } from "@/lib/supabase/admin";
-import { escribir } from "@/lib/db/write";
+import { escribir, intentar } from "@/lib/db/write";
 import { aCorreoDeAcceso, usuarioValido } from "@/lib/auth";
 import type { Estado } from "@/lib/db/mutaciones";
 
@@ -99,4 +99,24 @@ export async function cambiarMiUsuario(_p: Estado, d: FormData): Promise<Estado>
     ok: true,
     mensaje: `Listo. A partir de ahora entras escribiendo "${usuario}". Tu cartera no se movió.`,
   };
+}
+
+/** Cambiar el nombre visible. Es el que aparece en la pantalla de acceso. */
+export async function cambiarMiNombre(_p: Estado, d: FormData): Promise<Estado> {
+  const actual = await asesorActual();
+  if (!actual) return { ok: false, mensaje: "Sin sesión." };
+
+  const nombre = String(d.get("nombre") ?? "").trim();
+  if (nombre.length < 2) return { ok: false, mensaje: "Escribe un nombre." };
+
+  const supabase = await clienteServidor();
+  const r = await intentar(
+    "actualizar mi nombre",
+    supabase.from("asesores").update({ nombre }).eq("id", actual.id).select("id"),
+  );
+  if (!r.ok) return { ok: false, mensaje: r.mensaje };
+
+  revalidatePath("/perfil");
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: "Nombre actualizado." };
 }
