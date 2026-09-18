@@ -35,16 +35,19 @@ export function adminConfigurado(): boolean {
 /**
  * ¿El usuario de la sesión es superusuario?
  *
- * La fuente de verdad es asesores.es_super. ADMIN_EMAIL sigue funcionando
- * solo como arranque: sirve para marcarte a ti la primera vez, cuando
- * todavía no hay ningún superusuario en la tabla.
+ * ÚNICA fuente de verdad: asesores.es_super, columna que el propio asesor no
+ * puede escribir (migración 0004, permisos por columna).
+ *
+ * Antes existía un atajo por ADMIN_EMAIL: si el correo de la sesión coincidía
+ * con esa variable de entorno, se otorgaba superusuario. Estaba mal por dos
+ * razones. Concede privilegios desde un lugar invisible en la base de datos,
+ * así que auditar quién es administrador consultando `select es_super` daba
+ * una respuesta falsa. Y quien pueda editar variables de entorno se vuelve
+ * administrador sin dejar rastro. Se eliminó.
  */
 export async function esSuperusuario(): Promise<boolean> {
   const actual = await asesorActual();
   if (!actual) return false;
-
-  const arranque = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (arranque && actual.email?.trim().toLowerCase() === arranque) return true;
 
   try {
     const supabase = await clienteServidor();

@@ -78,10 +78,16 @@ export async function cambiarMiUsuario(_p: Estado, d: FormData): Promise<Estado>
       return { ok: false, mensaje: `No se pudo cambiar: ${error.message}` };
     }
 
+    // asesores.email tiene que seguir a la identidad real: la vista del
+    // selector se apoya en él para saber quién puede entrar con usuario corto.
     const supabase = await clienteServidor();
     await escribir(
       "actualizar mi usuario",
-      supabase.from("asesores").update({ usuario }).eq("id", actual.id).select("id"),
+      supabase
+        .from("asesores")
+        .update({ usuario, email: aCorreoDeAcceso(usuario) })
+        .eq("id", actual.id)
+        .select("id"),
     );
   } catch (causa) {
     return { ok: false, mensaje: causa instanceof Error ? causa.message : "Falló la operación." };

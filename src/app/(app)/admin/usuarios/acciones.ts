@@ -56,7 +56,7 @@ export async function crearUsuario(_p: Estado, d: FormData): Promise<Estado> {
     if (data.user) {
       const { error: errPerfil } = await admin
         .from("asesores")
-        .update({ usuario, nombre, email_contacto })
+        .update({ usuario, nombre, email_contacto, email: aCorreoDeAcceso(usuario) })
         .eq("id", data.user.id);
       if (errPerfil) console.error("[admin] perfil:", errPerfil.message);
     }
