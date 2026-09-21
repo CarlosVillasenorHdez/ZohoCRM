@@ -118,14 +118,28 @@ export async function cambiarActivo(d: FormData): Promise<void> {
   revalidatePath("/admin/usuarios");
 }
 
-export async function listarUsuarios(): Promise<
-  { id: string; usuario: string; nombre: string; activo: boolean; email_contacto: string | null }[]
-> {
+export type FilaUsuario = {
+  id: string;
+  usuario: string;
+  nombre: string;
+  activo: boolean;
+  es_super: boolean;
+  email_contacto: string | null;
+  correo_de_acceso: string;
+  usa_usuario_corto: boolean;
+  confirmado: boolean;
+};
+
+export async function listarUsuarios(): Promise<FilaUsuario[]> {
   if (!(await esSuperusuario())) return [];
   const admin = clienteAdmin();
+
+  // Se lee de v_usuarios_admin, que se une a auth.users: así lo que se
+  // muestra es la identidad REAL con la que entra cada cuenta, no una copia
+  // guardada en asesores que puede haberse desincronizado.
   const { data, error } = await admin
-    .from("asesores")
-    .select("id, usuario, nombre, activo, email_contacto, email")
+    .from("v_usuarios_admin")
+    .select("*")
     .order("nombre");
 
   if (error) {
@@ -133,12 +147,6 @@ export async function listarUsuarios(): Promise<
     return [];
   }
 
-  return (data ?? []).map((a) => ({
-    id: a.id,
-    usuario: a.usuario ?? String(a.email ?? "").split("@")[0] ?? "",
-    nombre: a.nombre,
-    activo: a.activo ?? true,
-    email_contacto: a.email_contacto,
-  }));
+  return (data ?? []) as FilaUsuario[];
 }
 

@@ -4,13 +4,7 @@ import { useState } from "react";
 import { crearUsuario, cambiarPassword, cambiarActivo } from "./acciones";
 import { Formulario, Campo } from "@/components/ui";
 
-type Usuario = {
-  id: string;
-  usuario: string;
-  nombre: string;
-  activo: boolean;
-  email_contacto: string | null;
-};
+import type { FilaUsuario as Usuario } from "./acciones";
 
 function sugerirPassword(): string {
   const abc = "abcdefghijkmnopqrstuvwxyzACDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -37,10 +31,23 @@ export function PanelUsuarios({ usuarios }: { usuarios: Usuario[] }) {
                 <span className="font-medium">{u.nombre}</span>
                 <span className="cifras shrink-0 text-sm text-tinta-suave">{u.usuario}</span>
               </div>
+              <p className="cifras mt-0.5 text-sm text-tinta-suave">
+                entra con {u.usa_usuario_corto ? u.usuario : u.correo_de_acceso}
+              </p>
               <p className="mt-0.5 text-sm text-tinta-suave">
                 {u.activo ? "Activo" : "Suspendido"}
-                {u.email_contacto ? ` · ${u.email_contacto}` : ""}
+                {u.es_super ? " · superusuario" : ""}
+                {!u.confirmado ? " · sin confirmar" : ""}
               </p>
+
+              {!u.usa_usuario_corto && (
+                <p className="mt-2 border-l-2 border-l-proximo py-1.5 pl-3 text-sm">
+                  Esta cuenta entra con su correo completo, así que no aparece en la lista de la
+                  pantalla de acceso. Para que aparezca, su dueño se fija un usuario desde Mi
+                  cuenta, o tú se lo cambias en Supabase → Authentication → Users → Update user,
+                  poniendo <span className="cifras">{u.usuario}@cartera.app</span>.
+                </p>
+              )}
 
               <div className="mt-2 flex flex-wrap gap-4">
                 <button
