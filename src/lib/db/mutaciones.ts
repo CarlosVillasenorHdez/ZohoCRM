@@ -426,3 +426,68 @@ export async function guardarTasas(_p: Estado, d: FormData): Promise<Estado> {
   revalidatePath("/polizas");
   return { ok: true, mensaje: "Tasas guardadas." };
 }
+
+// -------------------------------------------------------------- seguimientos
+
+
+/**
+ * Cierra una actividad registrando qué pasó y, si hay siguiente paso, la
+ * encadena. Las dos cosas en una sola transacción del lado de la base: o
+ * quedan ambas o no queda ninguna. Si se separaran, un fallo a medias
+ * dejaría la gestión cerrada y sin siguiente paso, que es justo como se
+ * pierden los prospectos.
+ */
+export async function registrarSeguimiento(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  const resultado = texto(d, "resultado");
+  if (!id || !resultado) return { ok: false, mensaje: "Falta decir qué pasó." };
+
+  const cuando = texto(d, "inicia_en");
+  const { supabase } = await sesion();
+
+  const { error } = await supabase.rpc("registrar_seguimiento", {
+    p_actividad_id: id,
+    p_resultado: resultado,
+    p_nota: texto(d, "nota"),
+    p_nuevo_titulo: texto(d, "titulo"),
+    p_nuevo_tipo: texto(d, "tipo"),
+    p_nuevo_inicia: cuando ? new Date(cuando).toISOString() : null,
+  });
+
+  if (error) {
+    console.error("[seguimiento]", error.message);
+    return { ok: false, mensaje: `No se pudo registrar: ${error.message}` };
+  }
+
+  // Cerrar la gestión puede cerrar también la oportunidad.
+  const oportunidad = texto(d, "oportunidad_id");
+  const cierra = texto(d, "cerrar_oportunidad");
+  if (!cuando && oportunidad && cierra === "1") {
+    const { asesor } = await sesion();
+    await intentar(
+      "cerrar oportunidad por seguimiento",
+      supabase
+        .from("oportunidades")
+        .update({
+          resultado: "perdida",
+          motivo_perdida: resultado === "ilocalizable" ? "no_responde" : "no_le_interesa",
+          motivo_detalle: texto(d, "nota"),
+          recontactar_en: texto(d, "recontactar_en"),
+        })
+        .eq("id", oportunidad)
+        .eq("asesor_id", asesor.id)
+        .select("id"),
+    );
+  }
+
+  revalidatePath("/panel");
+  revalidatePath("/agenda");
+  revalidatePath("/embudo");
+
+  return {
+    ok: true,
+    mensaje: cuando
+      ? "Listo. Quedó registrada y el siguiente paso ya está en tu agenda."
+      : "Gestión cerrada.",
+  };
+}

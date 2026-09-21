@@ -1,14 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { asesorActual } from "@/lib/supabase/server";
+import { asesorActual, clienteServidor } from "@/lib/supabase/server";
 import { alertasDelDia, enlaceWhatsApp, type AlertaConNombre } from "@/lib/db/panel";
 import { completarActividad, marcarReciboPagado } from "@/lib/db/mutaciones";
+import { Seguimiento } from "@/components/seguimiento";
+import { Kpi } from "@/components/kpi";
 import { fechaLarga, fechaCorta, hora, diasDesdeHoy, retraso, hoyISO } from "@/lib/fechas";
 
 export const dynamic = "force-dynamic";
 
-const TITULO_GRUPO = { atrasado: "Atrasado", hoy: "Hoy", proximo: "Esta semana" } as const;
-const REGLA = { atrasado: "border-l-atrasado", hoy: "border-l-tinta", proximo: "border-l-proximo" } as const;
+const TITULO_GRUPO = {
+  atrasado: "Ponte al día",
+  hoy: "Hoy",
+  proximo: "Esta semana",
+} as const;
+const REGLA = {
+  atrasado: "border-l-atrasado",
+  hoy: "border-l-tinta",
+  proximo: "border-l-proximo",
+} as const;
 const QUE_ES = {
   actividad: "Cita",
   recibo: "Recibo por cobrar",
@@ -17,26 +27,22 @@ const QUE_ES = {
 } as const;
 
 function mensajeSugerido(a: AlertaConNombre): string {
-  const nombre = a.nombre?.split(" ")[0] ?? "";
+  const n = a.nombre?.split(" ")[0] ?? "";
   switch (a.tipo_alerta) {
-    case "recibo":
-      return `Hola ${nombre}, te escribo por el recibo de tu póliza. ¿Te ayudo con el pago?`;
-    case "renovacion":
-      return `Hola ${nombre}, tu póliza está por renovar. ¿Lo revisamos esta semana?`;
-    case "recontacto":
-      return `Hola ${nombre}, quedamos en buscarte por estas fechas. ¿Tienes unos minutos?`;
-    default:
-      return `Hola ${nombre}, te confirmo nuestra cita.`;
+    case "recibo": return `Hola ${n}, te escribo por el recibo de tu póliza. ¿Te ayudo con el pago?`;
+    case "renovacion": return `Hola ${n}, tu póliza está por renovar. ¿Lo revisamos esta semana?`;
+    case "recontacto": return `Hola ${n}, quedamos en buscarte por estas fechas. ¿Tienes unos minutos?`;
+    default: return `Hola ${n}, te confirmo nuestra cita.`;
   }
 }
 
-function Renglon({ a }: { a: AlertaConNombre }) {
+function Renglon({ a, oportunidades }: { a: AlertaConNombre; oportunidades: Map<string, string> }) {
   const dias = diasDesdeHoy(a.fecha);
   const wa = enlaceWhatsApp(a.telefono, mensajeSugerido(a));
   const esCita = a.tipo_alerta === "actividad";
 
   return (
-    <li className={`border-l-2 ${REGLA[a.grupo]} py-3 pl-4`}>
+    <li className={`border-l-2 ${REGLA[a.grupo]} py-3.5 pl-4`}>
       <div className="flex items-baseline justify-between gap-3">
         {a.contacto_id ? (
           <Link href={`/contactos/${a.contacto_id}`} className="font-medium leading-snug underline-offset-4 hover:underline">
@@ -56,12 +62,19 @@ function Renglon({ a }: { a: AlertaConNombre }) {
         {a.grupo === "atrasado" ? ` · ${retraso(dias)}` : ""}
       </p>
 
-      <div className="mt-2 flex flex-wrap gap-4">
-        {a.tipo_alerta === "actividad" && (
+      <div className="mt-2.5 flex flex-wrap items-center gap-3">
+        {esCita && (
+          <Seguimiento
+            actividadId={a.referencia_id}
+            oportunidadId={a.contacto_id ? oportunidades.get(a.contacto_id) : null}
+            nombre={a.nombre}
+          />
+        )}
+        {esCita && (
           <form action={completarActividad}>
             <input type="hidden" name="id" value={a.referencia_id} />
-            <button className="text-sm font-medium text-corriente underline underline-offset-4">
-              Marcar hecho
+            <button className="text-sm text-tinta-suave underline underline-offset-4">
+              Solo marcar hecho
             </button>
           </form>
         )}
@@ -87,7 +100,19 @@ export default async function Panel() {
   const asesor = await asesorActual();
   if (!asesor) redirect("/login");
 
-  const { alertas, error } = await alertasDelDia(asesor.id);
+  const supabase = await clienteServidor();
+  const [{ alertas, error }, { data: oports }] = await Promise.all([
+    alertasDelDia(asesor.id),
+    supabase
+      .from("oportunidades")
+      .select("id, contacto_id")
+      .eq("asesor_id", asesor.id)
+      .is("resultado", null),
+  ]);
+
+  // Para poder cerrar la oportunidad desde el mismo seguimiento.
+  const porContacto = new Map<string, string>();
+  for (const o of oports ?? []) if (!porContacto.has(o.contacto_id)) porContacto.set(o.contacto_id, o.id);
 
   const grupos = (["atrasado", "hoy", "proximo"] as const)
     .map((g) => ({ grupo: g, filas: alertas.filter((a) => a.grupo === g) }))
@@ -95,17 +120,23 @@ export default async function Panel() {
 
   const atrasados = alertas.filter((a) => a.grupo === "atrasado").length;
   const deHoy = alertas.filter((a) => a.grupo === "hoy").length;
+  const proximos = alertas.filter((a) => a.grupo === "proximo").length;
 
   return (
     <main>
       <h1 className="text-2xl font-semibold tracking-tight first-letter:uppercase">
         {fechaLarga(hoyISO())}
       </h1>
-      <p className="mt-1.5 text-tinta-suave">
-        {alertas.length === 0
-          ? "Nada pendiente por ahora."
-          : `${deHoy} para hoy${atrasados > 0 ? ` y ${atrasados} atrasado${atrasados > 1 ? "s" : ""}` : ""}.`}
-      </p>
+
+      {alertas.length > 0 && (
+        <p className="mt-1.5 text-tinta-suave">
+          {atrasados > 0
+            ? `Traes ${atrasados} pendiente${atrasados > 1 ? "s" : ""} de días anteriores. Empieza por ahí.`
+            : deHoy > 0
+              ? "Vas al corriente. Esto es lo de hoy."
+              : "Nada para hoy. Lo que viene está abajo."}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="mt-6 border-l-2 border-l-atrasado py-2 pl-4 text-atrasado">
@@ -113,19 +144,24 @@ export default async function Panel() {
         </p>
       )}
 
-      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-10">
+      {alertas.length > 0 && (
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          <Kpi etiqueta="Atrasado" valor={String(atrasados)} tono={atrasados > 0 ? "malo" : "bueno"} />
+          <Kpi etiqueta="Hoy" valor={String(deHoy)} />
+          <Kpi etiqueta="Esta semana" valor={String(proximos)} tono="aviso" />
+        </div>
+      )}
+
+      <div className="mt-8 lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-10">
         <div>
           {!error && alertas.length === 0 && (
             <div className="border-t border-linea pt-7">
               <p className="max-w-prose text-tinta-suave">
-                Aquí van a caer tus citas del día, los recibos por cobrar, las pólizas
-                que estén por renovar y los prospectos que quedaste en volver a buscar.
-                Empieza capturando a alguien.
+                Aquí van a caer tus citas del día, los recibos por cobrar, las pólizas que estén
+                por renovar y los prospectos que quedaste en volver a buscar. Empieza capturando
+                a alguien.
               </p>
-              <Link
-                href="/contactos/nuevo"
-                className="mt-5 inline-block rounded-md bg-tinta px-4 py-2.5 font-medium text-papel"
-              >
+              <Link href="/contactos/nuevo" className="mt-5 inline-block rounded-md bg-tinta px-4 py-2.5 font-medium text-papel">
                 Capturar un prospecto
               </Link>
             </div>
@@ -133,10 +169,12 @@ export default async function Panel() {
 
           {grupos.map(({ grupo, filas }) => (
             <section key={grupo} className="mb-9">
-              <h2 className="mb-1 text-sm font-semibold text-tinta-suave">{TITULO_GRUPO[grupo]}</h2>
+              <h2 className={`mb-1 text-sm font-semibold ${grupo === "atrasado" ? "text-atrasado" : "text-tinta-suave"}`}>
+                {TITULO_GRUPO[grupo]} <span className="cifras font-normal">({filas.length})</span>
+              </h2>
               <ul className="divide-y divide-linea">
                 {filas.map((a) => (
-                  <Renglon key={`${a.tipo_alerta}-${a.referencia_id}`} a={a} />
+                  <Renglon key={`${a.tipo_alerta}-${a.referencia_id}`} a={a} oportunidades={porContacto} />
                 ))}
               </ul>
             </section>
@@ -146,21 +184,10 @@ export default async function Panel() {
         <aside className="mt-10 border-t border-linea pt-7 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
           <h2 className="mb-4 text-sm font-semibold text-tinta-suave">Atajos</h2>
           <ul className="flex flex-col gap-2.5">
-            <li>
-              <Link href="/contactos/nuevo" className="text-sm underline underline-offset-4">
-                Capturar prospecto
-              </Link>
-            </li>
-            <li>
-              <Link href="/agenda" className="text-sm underline underline-offset-4">
-                Agendar seguimiento
-              </Link>
-            </li>
-            <li>
-              <Link href="/embudo" className="text-sm underline underline-offset-4">
-                Ver el embudo
-              </Link>
-            </li>
+            <li><Link href="/contactos/nuevo" className="text-sm underline underline-offset-4">Capturar prospecto</Link></li>
+            <li><Link href="/agenda" className="text-sm underline underline-offset-4">Agendar seguimiento</Link></li>
+            <li><Link href="/embudo" className="text-sm underline underline-offset-4">Ver el embudo</Link></li>
+            <li><Link href="/polizas/nueva" className="text-sm underline underline-offset-4">Capturar póliza</Link></li>
           </ul>
         </aside>
       </div>

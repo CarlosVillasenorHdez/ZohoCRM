@@ -4,6 +4,7 @@ import { asesorActual, clienteServidor } from "@/lib/supabase/server";
 import { completarActividad } from "@/lib/db/mutaciones";
 import { Calendario } from "@/components/calendario";
 import { FormularioRapido } from "./formulario";
+import { Seguimiento } from "@/components/seguimiento";
 import { fechaLarga, hora, hoyISO, mesActualISO, diasDesdeHoy } from "@/lib/fechas";
 
 export const dynamic = "force-dynamic";
@@ -83,11 +84,12 @@ export default async function Agenda({
                       {a.tipo}
                       {a.lugar ? ` · ${a.lugar}` : ""}
                     </p>
-                    <div className="mt-2 flex gap-4">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-3">
+                      <Seguimiento actividadId={a.id} nombre={null} />
                       <form action={completarActividad}>
                         <input type="hidden" name="id" value={a.id} />
-                        <button className="text-sm font-medium text-corriente underline underline-offset-4">
-                          Marcar hecho
+                        <button className="text-sm text-tinta-suave underline underline-offset-4">
+                          Solo marcar hecho
                         </button>
                       </form>
                       {a.contacto_id && (
