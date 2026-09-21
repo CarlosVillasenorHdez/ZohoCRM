@@ -24,10 +24,22 @@ export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<Est
   let error;
   try {
     const supabase = await clienteServidor();
-    ({ error } = await supabase.auth.signInWithPassword({
-      email: aCorreoDeAcceso(usuario),
-      password,
-    }));
+
+    // El usuario corto se traduce a la credencial real preguntándole a la
+    // base. Así funciona igual para una cuenta creada como carlos@cartera.app
+    // que para una creada con correo real: la pantalla de acceso no tiene que
+    // saber cómo nació cada cuenta.
+    let correo = usuario;
+    if (!usuario.includes("@")) {
+      const { data, error: errRpc } = await supabase.rpc("correo_de_acceso", {
+        p_usuario: usuario,
+      });
+      if (errRpc) console.error("[login] correo_de_acceso:", errRpc.message);
+      // Si la función no existe todavía, se asume el dominio interno.
+      correo = typeof data === "string" && data ? data : aCorreoDeAcceso(usuario);
+    }
+
+    ({ error } = await supabase.auth.signInWithPassword({ email: correo, password }));
   } catch (causa) {
     console.error("[login] configuración:", causa instanceof Error ? causa.message : causa);
     return { mensaje: "El servidor no tiene la configuración de Supabase. Revisa /estado." };
