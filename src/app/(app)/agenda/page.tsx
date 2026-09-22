@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { asesorActual, clienteServidor } from "@/lib/supabase/server";
 import { completarActividad } from "@/lib/db/mutaciones";
-import { Calendario } from "@/components/calendario";
+import { Calendario, type EventoCal } from "@/components/calendario";
+import { colorTipo, etiquetaTipo } from "@/lib/tipos-actividad";
 import { FormularioRapido } from "./formulario";
 import { Seguimiento } from "@/components/seguimiento";
-import { fechaLarga, hora, hoyISO, mesActualISO, diasDesdeHoy } from "@/lib/fechas";
+import { fechaLarga, hora, hoyISO, mesActualISO, mesVecino, diasDesdeHoy } from "@/lib/fechas";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +32,13 @@ export default async function Agenda({
       .from("actividades")
       .select("id, titulo, tipo, inicia_en, lugar, contacto_id, estado")
       .eq("asesor_id", asesor.id)
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "completada"])
+      // Límite superior: el día 1 del mes siguiente. Usar `${mes}-31` rompía
+      // en los meses de 30 días y en febrero, porque esa fecha no existe y
+      // Postgres rechaza la consulta completa: la agenda salía vacía sin
+      // explicación.
       .gte("inicia_en", `${mes}-01T00:00:00`)
-      .lt("inicia_en", `${mes}-31T23:59:59.999`)
+      .lt("inicia_en", `${mesVecino(mes, 1)}-01T00:00:00`)
       .order("inicia_en", { ascending: true }),
     supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).order("nombre"),
   ]);
@@ -44,13 +49,19 @@ export default async function Agenda({
     nombre: [c.nombre, c.apellido_paterno].filter(Boolean).join(" "),
   }));
 
-  const porDia = new Map<string, number>();
-  for (const a of actividades) {
-    const d = a.inicia_en.slice(0, 10);
-    porDia.set(d, (porDia.get(d) ?? 0) + 1);
-  }
+  const eventos: EventoCal[] = actividades.map((a) => ({
+    id: a.id,
+    dia: a.inicia_en.slice(0, 10),
+    tipo: a.tipo,
+    titulo: a.titulo,
+    hora: hora(a.inicia_en),
+    pendiente: a.estado === "pendiente",
+  }));
 
-  const delDia = actividades.filter((a) => a.inicia_en.slice(0, 10) === dia);
+  const delDia = actividades
+    .filter((a) => a.inicia_en.slice(0, 10) === dia)
+    .sort((x, y) => x.inicia_en.localeCompare(y.inicia_en));
+  const pendientesDelDia = delDia.filter((a) => a.estado === "pendiente");
   const atrasado = diasDesdeHoy(dia) < 0;
 
   return (
@@ -59,12 +70,12 @@ export default async function Agenda({
 
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10">
         <div>
-          <Calendario mes={mes} porDia={porDia} diaActivo={dia} />
+          <Calendario mes={mes} eventos={eventos} diaActivo={dia} />
 
           <section className="mt-8">
             <h2 className="mb-1 text-sm font-semibold text-tinta-suave first-letter:uppercase">
               {fechaLarga(dia)}
-              {atrasado && delDia.length > 0 ? " · atrasado" : ""}
+              {atrasado && pendientesDelDia.length > 0 ? " · atrasado" : ""}
             </h2>
 
             {delDia.length === 0 ? (
@@ -74,16 +85,25 @@ export default async function Agenda({
                 {delDia.map((a) => (
                   <li
                     key={a.id}
-                    className={`border-l-2 py-3 pl-4 ${atrasado ? "border-l-atrasado" : "border-l-tinta"}`}
+                    className="py-3 pl-4"
+                    style={{
+                      borderLeft: `3px solid ${
+                        a.estado === "pendiente" && atrasado ? "#b4341f" : colorTipo(a.tipo)
+                      }`,
+                    }}
                   >
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="font-medium">{a.titulo}</span>
+                      <span className={`font-medium ${a.estado === "completada" ? "text-tinta-suave line-through" : ""}`}>
+                        {a.titulo}
+                      </span>
                       <span className="cifras shrink-0 text-sm text-tinta-suave">{hora(a.inicia_en)}</span>
                     </div>
                     <p className="mt-0.5 text-sm text-tinta-suave">
-                      {a.tipo}
+                      {etiquetaTipo(a.tipo)}
                       {a.lugar ? ` · ${a.lugar}` : ""}
+                      {a.estado === "completada" ? " · hecha" : ""}
                     </p>
+                    {a.estado === "pendiente" && (
                     <div className="mt-2.5 flex flex-wrap items-center gap-3">
                       <Seguimiento actividadId={a.id} nombre={null} />
                       <form action={completarActividad}>
@@ -98,6 +118,7 @@ export default async function Agenda({
                         </Link>
                       )}
                     </div>
+                    )}
                   </li>
                 ))}
               </ul>

@@ -89,3 +89,14 @@ describe("mesVecino", () => {
     expect(mesVecino("2026-01", -1)).toBe("2025-12");
   });
 });
+
+describe("límites de mes para consultas", () => {
+  it("el mes siguiente sirve como tope superior en meses de 30 días y en febrero", async () => {
+    const { mesVecino } = await import("./fechas");
+    // El bug: construir `${mes}-31` produce fechas inexistentes como
+    // 2026-09-31 o 2026-02-31, y Postgres rechaza la consulta entera.
+    expect(mesVecino("2026-09", 1)).toBe("2026-10");
+    expect(mesVecino("2026-02", 1)).toBe("2026-03");
+    expect(mesVecino("2024-02", 1)).toBe("2024-03"); // bisiesto
+  });
+});
