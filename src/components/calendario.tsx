@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { rejillaMes, diaDelMes, hoyISO, nombreMes, mesVecino } from "@/lib/fechas";
+import { rejillaMes, diaDelMes, hoyISO, nombreMes } from "@/lib/fechas";
+import { NavMes } from "@/components/nav-mes";
 import { colorTipo, etiquetaTipo } from "@/lib/tipos-actividad";
 
 const DIAS = ["L", "M", "M", "J", "V", "S", "D"];
@@ -33,14 +34,7 @@ export function Calendario({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-base font-semibold first-letter:uppercase">{nombreMes(mes)}</h2>
-        <div className="flex gap-1">
-          <Link href={`/agenda?mes=${mesVecino(mes, -1)}`} aria-label="Mes anterior"
-            className="rounded border border-linea px-2.5 py-1 text-sm text-tinta-suave hover:text-tinta">‹</Link>
-          <Link href="/agenda"
-            className="rounded border border-linea px-2.5 py-1 text-sm text-tinta-suave hover:text-tinta">Hoy</Link>
-          <Link href={`/agenda?mes=${mesVecino(mes, 1)}`} aria-label="Mes siguiente"
-            className="rounded border border-linea px-2.5 py-1 text-sm text-tinta-suave hover:text-tinta">›</Link>
-        </div>
+        <NavMes mes={mes} />
       </div>
 
       <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-linea bg-linea">

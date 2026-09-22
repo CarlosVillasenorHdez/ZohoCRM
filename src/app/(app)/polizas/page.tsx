@@ -18,7 +18,7 @@ export default async function Polizas() {
   const [{ data: pols, error }, { data: coms }] = await Promise.all([
     supabase
       .from("polizas")
-      .select("id, numero_poliza, ramo, contacto_id, fecha_fin, prima_total, estado, anio_vigencia")
+      .select("id, numero_poliza, ramo, contacto_id, fecha_fin, prima_total, estado, anio_vigencia, contactos(nombre, apellido_paterno)")
       .eq("asesor_id", asesor.id)
       .eq("estado", "vigente")
       .order("fecha_fin", { ascending: true }),
@@ -30,11 +30,11 @@ export default async function Polizas() {
   const totalComision = [...comision.values()].reduce((s, v) => s + v, 0);
   const totalPrima = polizas.reduce((s, p) => s + Number(p.prima_total ?? 0), 0);
 
-  const ids = [...new Set(polizas.map((p) => p.contacto_id))];
+  // Nombre por join en la misma consulta, no en una segunda vuelta.
   const nombres = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: cs } = await supabase.from("contactos").select("id, nombre, apellido_paterno").in("id", ids);
-    for (const c of cs ?? []) nombres.set(c.id, [c.nombre, c.apellido_paterno].filter(Boolean).join(" "));
+  for (const p of polizas) {
+    const c = (p as unknown as { contactos: { nombre: string; apellido_paterno: string | null } | null }).contactos;
+    if (c) nombres.set(p.contacto_id, [c.nombre, c.apellido_paterno].filter(Boolean).join(" "));
   }
 
   const porVencer = polizas.filter((p) => diasDesdeHoy(p.fecha_fin) <= 90);

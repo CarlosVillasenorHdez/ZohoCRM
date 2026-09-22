@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { leerConfig } from "./env";
-import { clienteServidor, asesorActual } from "./server";
+import { perfilActual } from "./server";
 
 /**
  * Cliente administrativo: usa la llave secreta y BYPASEA RLS.
@@ -46,18 +46,7 @@ export function adminConfigurado(): boolean {
  * administrador sin dejar rastro. Se eliminó.
  */
 export async function esSuperusuario(): Promise<boolean> {
-  const actual = await asesorActual();
-  if (!actual) return false;
-
-  try {
-    const supabase = await clienteServidor();
-    const { data } = await supabase
-      .from("asesores")
-      .select("es_super")
-      .eq("id", actual.id)
-      .maybeSingle();
-    return data?.es_super === true;
-  } catch {
-    return false;
-  }
+  const perfil = await perfilActual();
+  return perfil?.esSuper === true;
 }
+

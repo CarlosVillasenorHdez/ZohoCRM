@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 type CookieNueva = { name: string; value: string; options: CookieOptions };
@@ -38,7 +39,7 @@ export async function clienteServidor() {
  * no tumbar la página con un 500 que no le dice nada a nadie. El motivo real
  * queda en los logs del servidor.
  */
-export async function asesorActual() {
+export const asesorActual = cache(async function asesorActual() {
   try {
     const supabase = await clienteServidor();
     const { data, error } = await supabase.auth.getUser();
@@ -51,4 +52,37 @@ export async function asesorActual() {
     );
     return null;
   }
-}
+});
+
+/**
+ * Perfil del asesor: nombre y si es superusuario, en UNA consulta.
+ *
+ * cache() de React deduplica dentro de la misma petición: el layout y la
+ * página pueden pedirlo sin que se consulte dos veces. Antes el layout hacía
+ * getUser, luego esSuperusuario hacía getUser otra vez más una consulta, y
+ * la página un tercer getUser. Cada viaje a Supabase cuesta entre 0.2 y 0.6
+ * segundos desde Vercel, así que eso solo eran más de un segundo de espera.
+ */
+export const perfilActual = cache(async function perfilActual() {
+  const usuario = await asesorActual();
+  if (!usuario) return null;
+
+  try {
+    const supabase = await clienteServidor();
+    const { data } = await supabase
+      .from("asesores")
+      .select("nombre, usuario, es_super")
+      .eq("id", usuario.id)
+      .maybeSingle();
+
+    return {
+      id: usuario.id,
+      email: usuario.email ?? "",
+      nombre: data?.nombre ?? usuario.email ?? "",
+      usuario: data?.usuario ?? "",
+      esSuper: data?.es_super === true,
+    };
+  } catch {
+    return { id: usuario.id, email: usuario.email ?? "", nombre: "", usuario: "", esSuper: false };
+  }
+})

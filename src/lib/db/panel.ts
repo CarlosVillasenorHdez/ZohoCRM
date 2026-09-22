@@ -25,6 +25,8 @@ export async function alertasDelDia(asesorId: string): Promise<{
 }> {
   const supabase = await clienteServidor();
 
+  // Una sola consulta: v_panel_dia ya trae nombre y teléfono desde la
+  // migración 0009. Antes eran dos viajes encadenados a Supabase.
   const { data, error } = await supabase
     .from("v_panel_dia")
     .select("*")
@@ -36,37 +38,12 @@ export async function alertasDelDia(asesorId: string): Promise<{
     return { alertas: [], error: "No se pudieron cargar tus pendientes." };
   }
 
-  const filas = (data ?? []) as AlertaPanel[];
-  const ids = [...new Set(filas.map((f) => f.contacto_id).filter((v): v is string => !!v))];
-
-  const nombres = new Map<string, { nombre: string; telefono: string | null }>();
-  if (ids.length > 0) {
-    const { data: contactos, error: errContactos } = await supabase
-      .from("contactos")
-      .select("id, nombre, apellido_paterno, telefono_movil")
-      .in("id", ids);
-
-    if (errContactos) {
-      console.error("[panel] no se pudieron leer los contactos:", errContactos.message);
-    }
-
-    for (const c of contactos ?? []) {
-      nombres.set(c.id, {
-        nombre: [c.nombre, c.apellido_paterno].filter(Boolean).join(" "),
-        telefono: c.telefono_movil,
-      });
-    }
-  }
-
-  const alertas = filas.map((f) => {
-    const c = f.contacto_id ? nombres.get(f.contacto_id) : undefined;
-    return {
+  const alertas = ((data ?? []) as (AlertaPanel & { nombre: string | null; telefono: string | null })[])
+    .map((f) => ({
       ...f,
-      nombre: c?.nombre ?? null,
-      telefono: c?.telefono ?? null,
+      nombre: f.nombre && f.nombre.trim() !== "" ? f.nombre : null,
       grupo: agrupar(f),
-    };
-  });
+    }));
 
   return { alertas, error: null };
 }

@@ -24,25 +24,24 @@ export default async function Embudo() {
   const [{ data, error }, { data: resumen }] = await Promise.all([
     supabase
       .from("oportunidades")
-      .select("id, contacto_id, ramo, subtipo, etapa, etapa_cambiada_en, prima_estimada")
+      .select("id, contacto_id, ramo, subtipo, etapa, etapa_cambiada_en, prima_estimada, contactos(nombre, apellido_paterno)")
       .eq("asesor_id", asesor.id)
       .is("resultado", null)
       .order("etapa_cambiada_en", { ascending: true }),
     supabase.from("v_embudo_resumen").select("*").eq("asesor_id", asesor.id).maybeSingle(),
   ]);
 
-  const filas = data ?? [];
-  const ids = [...new Set(filas.map((o) => o.contacto_id))];
-  const nombres = new Map<string, string>();
-  if (ids.length > 0) {
-    const { data: cs } = await supabase.from("contactos").select("id, nombre, apellido_paterno").in("id", ids);
-    for (const c of cs ?? []) nombres.set(c.id, [c.nombre, c.apellido_paterno].filter(Boolean).join(" "));
-  }
+  // El nombre viene en la misma consulta (join de PostgREST). Antes era una
+  // segunda ida a Supabase que no podía empezar hasta terminar la primera.
+  type ConContacto = { contactos: { nombre: string; apellido_paterno: string | null } | null };
+  const filas = (data ?? []) as (typeof data extends null ? never : NonNullable<typeof data>[number] & ConContacto)[];
 
   const tarjetas: Tarjeta[] = filas.map((o) => ({
     id: o.id,
     contacto_id: o.contacto_id,
-    nombre: nombres.get(o.contacto_id) ?? "Sin nombre",
+    nombre:
+      [o.contactos?.nombre, o.contactos?.apellido_paterno].filter(Boolean).join(" ") ||
+      "Sin nombre",
     ramo: o.ramo as Ramo,
     subtipo: o.subtipo,
     etapa: o.etapa as Etapa,

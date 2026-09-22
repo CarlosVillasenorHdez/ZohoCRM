@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { salir } from "@/app/login/actions";
-import { asesorActual } from "@/lib/supabase/server";
-import { esSuperusuario } from "@/lib/supabase/admin";
+import { perfilActual } from "@/lib/supabase/server";
 import { Lateral, Pestanas, type Destino } from "@/components/nav";
 import {
   IconoHoy, IconoEmbudo, IconoContactos, IconoAgenda, IconoUsuarios, IconoPolizas,
 } from "@/components/iconos";
 
 export default async function LayoutApp({ children }: { children: React.ReactNode }) {
-  const actual = await asesorActual();
-  const admin = await esSuperusuario();
+  // Una sola consulta, deduplicada con la que hace la página.
+  const perfil = await perfilActual();
+  const admin = perfil?.esSuper === true;
 
   const destinos: Destino[] = [
     { href: "/panel", texto: "Hoy", icono: <IconoHoy /> },
