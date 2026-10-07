@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { crearOportunidad, crearActividad } from "@/lib/db/mutaciones";
 import { Formulario, Campo, Selector, AreaTexto } from "@/components/ui";
-import { ETAPAS, ETIQUETA_ETAPA, ETIQUETA_RAMO, type Ramo } from "@/lib/types/database";
-
-const RAMOS: Ramo[] = ["ahorro", "gmm", "autos", "vida", "danos"];
+import { ETAPAS, ETIQUETA_ETAPA } from "@/lib/types/database";
+import { CamposRamo } from "@/components/campos-ramo";
 
 export function PanelAcciones({ contactoId, nombre }: { contactoId: string; nombre: string }) {
   const [abierto, setAbierto] = useState<"nada" | "oportunidad" | "cita">("nada");
@@ -47,19 +46,28 @@ export function PanelAcciones({ contactoId, nombre }: { contactoId: string; nomb
       </div>
 
       {abierto === "oportunidad" ? (
-        <Formulario accion={crearOportunidad} boton="Crear oportunidad" alGuardar="limpiar" ocultos={{ contacto_id: contactoId }}>
-          <Selector
-            etiqueta="Ramo"
-            nombre="ramo"
-            opciones={RAMOS.map((r) => ({ valor: r, texto: ETIQUETA_RAMO[r] }))}
-          />
-          <Campo etiqueta="Producto" nombre="subtipo" ayuda="Ej. retiro, SeguBeca, ahorro puro" />
+        <Formulario accion={crearOportunidad} boton="Crear cotización" alGuardar="limpiar" ocultos={{ contacto_id: contactoId }}>
+          <CamposRamo />
           <Selector
             etiqueta="Etapa"
             nombre="etapa"
             opciones={ETAPAS.map((e) => ({ valor: e, texto: ETIQUETA_ETAPA[e] }))}
           />
-          <Campo etiqueta="Prima estimada anual" nombre="prima_estimada" tipo="text" />
+          <Campo etiqueta="Prima estimada anual" nombre="prima_estimada" ayuda="Lo que calculas de entrada." />
+          <Campo etiqueta="Cotización en firme" nombre="prima_cotizada" ayuda="La que devuelve la aseguradora. Se puede llenar después." />
+          <Campo etiqueta="Fecha de la cotización" nombre="fecha_cotizacion" tipo="date" />
+          <Selector
+            etiqueta="Forma de pago propuesta"
+            nombre="forma_pago"
+            opciones={[
+              { valor: "", texto: "— sin definir —" },
+              { valor: "anual", texto: "Anual" },
+              { valor: "semestral", texto: "Semestral" },
+              { valor: "trimestral", texto: "Trimestral" },
+              { valor: "mensual", texto: "Mensual" },
+            ]}
+          />
+          <Campo etiqueta="Inicio de vigencia propuesto" nombre="vigencia_inicio" tipo="date" />
           <AreaTexto etiqueta="Notas" nombre="notas" />
         </Formulario>
       ) : (

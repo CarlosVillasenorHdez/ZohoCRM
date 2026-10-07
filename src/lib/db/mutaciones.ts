@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { clienteServidor, asesorActual } from "@/lib/supabase/server";
 import { escribir, intentar } from "@/lib/db/write";
 import type { Etapa, Ramo } from "@/lib/types/database";
+import { leerDatos } from "@/lib/catalogo";
 
 // Los archivos "use server" solo pueden exportar funciones async. El tipo se
 // borra al compilar, así que sí puede vivir aquí; el valor inicial no, y por
@@ -98,6 +99,7 @@ export async function crearOportunidad(_p: Estado, d: FormData): Promise<Estado>
   const ramo = texto(d, "ramo") as Ramo | null;
   if (!contacto_id || !ramo) return { ok: false, mensaje: "Falta el contacto o el ramo." };
 
+  const subtipo = texto(d, "subtipo");
   const { asesor, supabase } = await sesion();
 
   const r = await intentar(
@@ -108,10 +110,16 @@ export async function crearOportunidad(_p: Estado, d: FormData): Promise<Estado>
         asesor_id: asesor.id,
         contacto_id,
         ramo,
-        subtipo: texto(d, "subtipo"),
+        subtipo,
         etapa: texto(d, "etapa") ?? "primer_contacto",
         prima_estimada: numero(d, "prima_estimada"),
+        prima_cotizada: numero(d, "prima_cotizada"),
+        fecha_cotizacion: texto(d, "fecha_cotizacion"),
+        forma_pago: texto(d, "forma_pago"),
+        vigencia_inicio: texto(d, "vigencia_inicio"),
         moneda: texto(d, "moneda") ?? "MXN",
+        // Solo los campos que aplican a este ramo y producto.
+        datos: leerDatos(ramo, subtipo, (n) => texto(d, n)),
         notas: texto(d, "notas"),
       })
       .select("id"),
@@ -120,10 +128,52 @@ export async function crearOportunidad(_p: Estado, d: FormData): Promise<Estado>
   if (!r.ok) return { ok: false, mensaje: r.mensaje };
   revalidatePath("/embudo");
   revalidatePath(`/contactos/${contacto_id}`);
-  return { ok: true, mensaje: "Oportunidad creada." };
+  return { ok: true, mensaje: "Cotización creada." };
 }
 
-/** Para arrastrar y soltar: recibe valores directos, no FormData. */
+/**
+ * Editar una cotización.
+ *
+ * Imprescindible porque la captura es progresiva: los datos de la moto salen
+ * en la primera llamada, la cotización en firme llega días después. Sin
+ * edición, los campos serían de un solo uso y volveríamos a las notas.
+ */
+export async function actualizarOportunidad(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  const ramo = texto(d, "ramo") as Ramo | null;
+  if (!id || !ramo) return { ok: false, mensaje: "Faltan datos." };
+
+  const subtipo = texto(d, "subtipo");
+  const { asesor, supabase } = await sesion();
+
+  const r = await intentar(
+    "actualizar oportunidad",
+    supabase
+      .from("oportunidades")
+      .update({
+        ramo,
+        subtipo,
+        etapa: texto(d, "etapa") ?? undefined,
+        prima_estimada: numero(d, "prima_estimada"),
+        prima_cotizada: numero(d, "prima_cotizada"),
+        fecha_cotizacion: texto(d, "fecha_cotizacion"),
+        forma_pago: texto(d, "forma_pago"),
+        vigencia_inicio: texto(d, "vigencia_inicio"),
+        datos: leerDatos(ramo, subtipo, (n) => texto(d, n)),
+        notas: texto(d, "notas"),
+      })
+      .eq("id", id)
+      .eq("asesor_id", asesor.id)
+      .is("eliminado_en", null)
+      .select("id"),
+  );
+
+  if (!r.ok) return { ok: false, mensaje: r.mensaje };
+  revalidatePath("/embudo");
+  revalidatePath(`/embudo/${id}`);
+  return { ok: true, mensaje: "Cotización actualizada." };
+}
+
 export async function moverOportunidad(id: string, etapa: Etapa): Promise<void> {
   const { asesor, supabase } = await sesion();
   await escribir(
@@ -266,33 +316,6 @@ export async function marcarReciboPagado(d: FormData): Promise<void> {
 
 // ------------------------------------------------------------------ pólizas
 
-/** Campos propios de cada ramo; se guardan en polizas.datos (JSONB). */
-function datosDelRamo(ramo: string, d: FormData): Record<string, unknown> {
-  const t = (k: string) => texto(d, k);
-  const n = (k: string) => numero(d, k);
-
-  switch (ramo) {
-    case "autos":
-      return {
-        placas: t("placas"), marca: t("marca"), modelo: t("modelo"),
-        anio: n("anio"), cobertura: t("cobertura"),
-      };
-    case "gmm":
-      return {
-        suma_asegurada: n("suma_asegurada"), deducible: n("deducible"),
-        coaseguro: n("coaseguro"), hospital: t("hospital"),
-      };
-    case "ahorro":
-    case "vida":
-      return {
-        plazo_anios: n("plazo_anios"), aportacion: n("aportacion"),
-        beneficiario: t("beneficiario"),
-      };
-    default:
-      return {};
-  }
-}
-
 export async function crearPoliza(_p: Estado, d: FormData): Promise<Estado> {
   const contacto_id = texto(d, "contacto_id");
   const numero_poliza = texto(d, "numero_poliza");
@@ -333,7 +356,7 @@ export async function crearPoliza(_p: Estado, d: FormData): Promise<Estado> {
         forma_pago: texto(d, "forma_pago") ?? "anual",
         tipo_renovacion,
         comision_pct: numero(d, "comision_pct"),
-        datos: datosDelRamo(ramo, d),
+        datos: leerDatos(ramo, texto(d, "subtipo"), (n) => texto(d, n)),
         notas: texto(d, "notas"),
       })
       .select("id"),
@@ -356,10 +379,38 @@ export async function crearPoliza(_p: Estado, d: FormData): Promise<Estado> {
     }
   }
 
+  // Si la póliza nace de una cotización, se cierra el círculo: la cotización
+  // queda ganada y apunta a su póliza. Sin esto, "emitida o no" dependería de
+  // que alguien se acordara de cerrarla a mano, y el embudo mentiría.
+  const oportunidad_id = texto(d, "oportunidad_id");
+  if (oportunidad_id && creada?.id) {
+    const cierre = await intentar(
+      "marcar cotización como ganada",
+      supabase
+        .from("oportunidades")
+        .update({ resultado: "ganada", poliza_id: creada.id })
+        .eq("id", oportunidad_id)
+        .eq("asesor_id", asesor.id)
+        .select("id"),
+    );
+    if (!cierre.ok) {
+      return {
+        ok: true,
+        mensaje: `Póliza ${numero_poliza} guardada, pero la cotización no quedó marcada como ganada. Ciérrala desde el embudo.`,
+      };
+    }
+  }
+
   revalidatePath("/polizas");
   revalidatePath("/panel");
+  revalidatePath("/embudo");
   revalidatePath(`/contactos/${contacto_id}`);
-  return { ok: true, mensaje: `Póliza ${numero_poliza} guardada, con sus recibos.` };
+  return {
+    ok: true,
+    mensaje: oportunidad_id
+      ? `Póliza ${numero_poliza} guardada con sus recibos. La cotización quedó como ganada.`
+      : `Póliza ${numero_poliza} guardada, con sus recibos.`,
+  };
 }
 
 export async function renovarPoliza(_p: Estado, d: FormData): Promise<Estado> {

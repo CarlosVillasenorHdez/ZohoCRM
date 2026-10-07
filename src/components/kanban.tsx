@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { moverOportunidad } from "@/lib/db/mutaciones";
 import { ETAPAS, ETIQUETA_ETAPA, ETIQUETA_RAMO, type Etapa, type Ramo } from "@/lib/types/database";
 import { retraso } from "@/lib/fechas";
+import { etiquetaProducto } from "@/lib/catalogo";
 import { tonoPorDias, COLOR_TONO, TEXTO_TONO } from "@/lib/antiguedad";
 
 export type Tarjeta = {
@@ -90,11 +91,12 @@ export function Kanban({ tarjetas }: { tarjetas: Tarjeta[] }) {
                     }`}
                     style={{ borderLeft: `3px solid ${COLOR_TONO[tono]}` }}
                   >
-                    <Link href={`/contactos/${t.contacto_id}`} className="font-medium leading-snug underline-offset-4 hover:underline">
+                    <Link href={`/embudo/${t.id}`} className="font-medium leading-snug underline-offset-4 hover:underline">
                       {t.nombre}
                     </Link>
                     <p className="mt-1 text-xs text-tinta-suave">
-                      {ETIQUETA_RAMO[t.ramo]}{t.subtipo ? ` · ${t.subtipo}` : ""}
+                      {ETIQUETA_RAMO[t.ramo]}
+                      {t.subtipo ? ` · ${etiquetaProducto(t.ramo, t.subtipo)}` : ""}
                     </p>
 
                     <div className="mt-2.5 flex items-center gap-1.5">

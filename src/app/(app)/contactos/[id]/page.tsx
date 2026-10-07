@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { asesorActual, clienteServidor } from "@/lib/supabase/server";
 import { ETIQUETA_RAMO, ETIQUETA_ETAPA, type Ramo, type Etapa } from "@/lib/types/database";
+import { etiquetaProducto } from "@/lib/catalogo";
 import { enlaceWhatsApp } from "@/lib/db/panel";
 import { fechaCorta, hora } from "@/lib/fechas";
 import { PanelAcciones } from "./acciones";
@@ -55,7 +56,10 @@ export default async function DetalleContacto({ params }: { params: Promise<{ id
             {(oportunidades ?? []).map((o) => (
               <li key={o.id} className="py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-medium">{ETIQUETA_RAMO[o.ramo as Ramo]}{o.subtipo ? ` · ${o.subtipo}` : ""}</span>
+                  <Link href={`/embudo/${o.id}`} className="font-medium underline-offset-4 hover:underline">
+                    {ETIQUETA_RAMO[o.ramo as Ramo]}
+                    {o.subtipo ? ` · ${etiquetaProducto(o.ramo, o.subtipo)}` : ""}
+                  </Link>
                   <span className="cifras shrink-0 text-sm text-tinta-suave">
                     {o.prima_estimada ? `$${Number(o.prima_estimada).toLocaleString("es-MX")}` : ""}
                   </span>
