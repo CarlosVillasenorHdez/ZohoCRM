@@ -21,6 +21,7 @@ export default async function Polizas() {
       .select("id, numero_poliza, ramo, contacto_id, fecha_fin, prima_total, estado, anio_vigencia, contactos(nombre, apellido_paterno)")
       .eq("asesor_id", asesor.id)
       .eq("estado", "vigente")
+      .is("eliminado_en", null)
       .order("fecha_fin", { ascending: true }),
     supabase.from("v_comisiones").select("poliza_id, comision_estimada, pct_aplicado").eq("asesor_id", asesor.id),
   ]);

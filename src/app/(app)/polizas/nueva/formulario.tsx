@@ -20,7 +20,7 @@ export function FormularioPoliza({
   const continua = ramo === "ahorro" || ramo === "vida";
 
   return (
-    <Formulario accion={crearPoliza} boton="Guardar póliza">
+    <Formulario accion={crearPoliza} boton="Guardar póliza" alGuardar="limpiar" limpiable>
       <Selector
         etiqueta="Cliente"
         nombre="contacto_id"

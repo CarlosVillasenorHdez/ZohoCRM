@@ -27,6 +27,7 @@ export default async function Embudo() {
       .select("id, contacto_id, ramo, subtipo, etapa, etapa_cambiada_en, prima_estimada, contactos(nombre, apellido_paterno)")
       .eq("asesor_id", asesor.id)
       .is("resultado", null)
+      .is("eliminado_en", null)
       .order("etapa_cambiada_en", { ascending: true }),
     supabase.from("v_embudo_resumen").select("*").eq("asesor_id", asesor.id).maybeSingle(),
   ]);

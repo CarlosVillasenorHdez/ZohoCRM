@@ -107,7 +107,8 @@ export default async function Panel() {
       .from("oportunidades")
       .select("id, contacto_id")
       .eq("asesor_id", asesor.id)
-      .is("resultado", null),
+      .is("resultado", null)
+      .is("eliminado_en", null),
   ]);
 
   // Para poder cerrar la oportunidad desde el mismo seguimiento.

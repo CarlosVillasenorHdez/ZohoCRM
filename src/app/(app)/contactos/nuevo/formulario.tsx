@@ -9,7 +9,7 @@ export function FormularioContacto({
   posiblesReferentes: { id: string; nombre: string }[];
 }) {
   return (
-    <Formulario accion={crearContacto} boton="Guardar prospecto">
+    <Formulario accion={crearContacto} boton="Guardar prospecto" alGuardar="limpiar" limpiable>
       <Campo etiqueta="Nombre" nombre="nombre" requerido />
       <Campo etiqueta="Apellido paterno" nombre="apellido_paterno" />
       <Campo etiqueta="Celular" nombre="telefono_movil" tipo="tel" ayuda="Con este número se arma el enlace de WhatsApp." />
