@@ -13,6 +13,7 @@ export default async function NuevoContacto() {
     .from("contactos")
     .select("id, nombre, apellido_paterno")
     .eq("asesor_id", asesor.id)
+    .is("eliminado_en", null)
     .order("nombre");
 
   const posibles = (data ?? []).map((c) => ({

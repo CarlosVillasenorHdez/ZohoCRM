@@ -11,7 +11,7 @@ export function FormularioRapido({
   diaSugerido?: string;
 }) {
   return (
-    <Formulario accion={crearActividad} boton="Agendar">
+    <Formulario accion={crearActividad} boton="Agendar" alGuardar="limpiar" limpiable>
       <Campo etiqueta="Qué vas a hacer" nombre="titulo" requerido />
       <Campo
         etiqueta="Cuándo"

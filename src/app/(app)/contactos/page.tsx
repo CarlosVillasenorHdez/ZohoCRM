@@ -14,6 +14,7 @@ export default async function Contactos() {
     .select("id, nombre, apellido_paterno, telefono_movil, origen")
     .eq("asesor_id", asesor.id)
     .eq("archivado", false)
+    .is("eliminado_en", null)
     .order("creado_en", { ascending: false });
 
   const contactos = data ?? [];

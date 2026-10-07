@@ -47,7 +47,7 @@ export function PanelAcciones({ contactoId, nombre }: { contactoId: string; nomb
       </div>
 
       {abierto === "oportunidad" ? (
-        <Formulario accion={crearOportunidad} boton="Crear oportunidad" ocultos={{ contacto_id: contactoId }}>
+        <Formulario accion={crearOportunidad} boton="Crear oportunidad" alGuardar="limpiar" ocultos={{ contacto_id: contactoId }}>
           <Selector
             etiqueta="Ramo"
             nombre="ramo"
@@ -63,7 +63,7 @@ export function PanelAcciones({ contactoId, nombre }: { contactoId: string; nomb
           <AreaTexto etiqueta="Notas" nombre="notas" />
         </Formulario>
       ) : (
-        <Formulario accion={crearActividad} boton="Agendar" ocultos={{ contacto_id: contactoId }}>
+        <Formulario accion={crearActividad} boton="Agendar" alGuardar="limpiar" ocultos={{ contacto_id: contactoId }}>
           <Campo etiqueta="Qué vas a hacer" nombre="titulo" requerido />
           <Selector
             etiqueta="Tipo"

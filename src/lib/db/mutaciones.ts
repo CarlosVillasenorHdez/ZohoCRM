@@ -491,3 +491,78 @@ export async function registrarSeguimiento(_p: Estado, d: FormData): Promise<Est
       : "Gestión cerrada.",
   };
 }
+
+// ------------------------------------------------------------------ borrado
+
+/**
+ * Borrado lógico: se marca `eliminado_en` y desaparece de todas las pantallas.
+ *
+ * No se usa DELETE porque una póliza arrastra recibos y una oportunidad
+ * arrastra actividades: un borrado en cascada se llevaría historial que a
+ * veces es lo único que explica por qué un cliente está donde está. Y con el
+ * sistema en uso, un borrado por error tiene que poder deshacerse.
+ */
+async function marcarEliminado(
+  tabla: "polizas" | "oportunidades" | "actividades",
+  id: string,
+  rutas: string[],
+): Promise<Estado> {
+  const { asesor, supabase } = await sesion();
+
+  const r = await intentar(
+    `eliminar ${tabla}`,
+    supabase
+      .from(tabla)
+      .update({ eliminado_en: new Date().toISOString() })
+      .eq("id", id)
+      .eq("asesor_id", asesor.id)
+      .is("eliminado_en", null)
+      .select("id"),
+  );
+
+  if (!r.ok) return { ok: false, mensaje: r.mensaje };
+  for (const ruta of rutas) revalidatePath(ruta);
+  return { ok: true, mensaje: "Eliminado." };
+}
+
+export async function eliminarPoliza(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  if (!id) return { ok: false, mensaje: "Falta la póliza." };
+  const r = await marcarEliminado("polizas", id, ["/polizas", "/panel"]);
+  return r.ok ? { ok: true, mensaje: "Póliza eliminada junto con sus recibos." } : r;
+}
+
+export async function eliminarOportunidad(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  if (!id) return { ok: false, mensaje: "Falta la oportunidad." };
+  return marcarEliminado("oportunidades", id, ["/embudo", "/panel"]);
+}
+
+export async function eliminarActividad(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  if (!id) return { ok: false, mensaje: "Falta la actividad." };
+  return marcarEliminado("actividades", id, ["/agenda", "/panel"]);
+}
+
+/**
+ * Borrar un contacto arrastra sus oportunidades, actividades y pólizas, en una
+ * sola transacción de la base. Se niega si tiene pólizas vigentes: borrar al
+ * titular de un seguro vivo nunca es lo que alguien quiso hacer.
+ */
+export async function eliminarContacto(_p: Estado, d: FormData): Promise<Estado> {
+  const id = texto(d, "id");
+  if (!id) return { ok: false, mensaje: "Falta el contacto." };
+
+  const { supabase } = await sesion();
+  const { error } = await supabase.rpc("eliminar_contacto", { p_contacto_id: id });
+
+  if (error) {
+    console.error("[eliminar contacto]", error.message);
+    return { ok: false, mensaje: error.message.replace(/^.*?:\s*/, "") };
+  }
+
+  revalidatePath("/contactos");
+  revalidatePath("/panel");
+  revalidatePath("/embudo");
+  return { ok: true, mensaje: "Contacto eliminado con todo lo suyo." };
+}

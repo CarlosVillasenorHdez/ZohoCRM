@@ -5,6 +5,8 @@ import { marcarReciboPagado } from "@/lib/db/mutaciones";
 import { ETIQUETA_RAMO, type Ramo } from "@/lib/types/database";
 import { fechaCorta, fechaLarga, diasDesdeHoy, retraso } from "@/lib/fechas";
 import { CajaRenovar } from "./renovar";
+import { Eliminar } from "@/components/eliminar";
+import { eliminarPoliza } from "@/lib/db/mutaciones";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +31,14 @@ export default async function DetallePoliza({ params }: { params: Promise<{ id: 
     .select("*")
     .eq("id", id)
     .eq("asesor_id", asesor.id)
+    .is("eliminado_en", null)
     .maybeSingle();
 
   if (!p) notFound();
 
   const [{ data: recibos }, { data: contacto }, { data: com }] = await Promise.all([
     supabase.from("recibos").select("*").eq("poliza_id", id).order("numero"),
-    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("id", p.contacto_id).maybeSingle(),
+    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("id", p.contacto_id).is("eliminado_en", null).maybeSingle(),
     supabase.from("v_comisiones").select("comision_estimada, pct_aplicado").eq("poliza_id", id).maybeSingle(),
   ]);
 
@@ -148,7 +151,16 @@ export default async function DetallePoliza({ params }: { params: Promise<{ id: 
         </aside>
       </div>
 
-      <p className="mt-10 text-sm text-tinta-suave">
+      <div className="mt-10 border-t border-linea pt-6">
+        <Eliminar
+          accion={eliminarPoliza}
+          id={p.id}
+          que="esta póliza"
+          advertencia="Se va junto con sus recibos y deja de contar para tus comisiones."
+        />
+      </div>
+
+      <p className="mt-8 text-sm text-tinta-suave">
         Capturada para el periodo que inicia el {fechaLarga(p.fecha_inicio)}.
       </p>
     </main>

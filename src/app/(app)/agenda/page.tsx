@@ -6,6 +6,8 @@ import { Calendario, type EventoCal } from "@/components/calendario";
 import { colorTipo, etiquetaTipo } from "@/lib/tipos-actividad";
 import { FormularioRapido } from "./formulario";
 import { Seguimiento } from "@/components/seguimiento";
+import { Eliminar } from "@/components/eliminar";
+import { eliminarActividad } from "@/lib/db/mutaciones";
 import { fechaLarga, hora, hoyISO, mesActualISO, mesVecino, diasDesdeHoy } from "@/lib/fechas";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function Agenda({
       .from("actividades")
       .select("id, titulo, tipo, inicia_en, lugar, contacto_id, estado")
       .eq("asesor_id", asesor.id)
+      .is("eliminado_en", null)
       .in("estado", ["pendiente", "completada"])
       // Límite superior: el día 1 del mes siguiente. Usar `${mes}-31` rompía
       // en los meses de 30 días y en febrero, porque esa fecha no existe y
@@ -40,7 +43,7 @@ export default async function Agenda({
       .gte("inicia_en", `${mes}-01T00:00:00`)
       .lt("inicia_en", `${mesVecino(mes, 1)}-01T00:00:00`)
       .order("inicia_en", { ascending: true }),
-    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).order("nombre"),
+    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).is("eliminado_en", null).order("nombre"),
   ]);
 
   const actividades = acts ?? [];
@@ -117,6 +120,7 @@ export default async function Agenda({
                           Ver contacto
                         </Link>
                       )}
+                      <Eliminar accion={eliminarActividad} id={a.id} que="esta actividad" />
                     </div>
                     )}
                   </li>

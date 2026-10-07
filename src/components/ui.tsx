@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import type { Estado } from "@/lib/db/mutaciones";
 
 export const INICIAL: Estado = { mensaje: null, ok: false };
@@ -63,17 +63,34 @@ export function AreaTexto({ etiqueta, nombre, valor }: { etiqueta: string; nombr
 }
 
 export function Formulario({
-  accion, boton, children, ocultos,
+  accion, boton, children, ocultos, alGuardar = "conservar", limpiable = false,
 }: {
   accion: (p: Estado, d: FormData) => Promise<Estado>;
   boton: string;
   children: React.ReactNode;
   ocultos?: Record<string, string | null | undefined>;
+  /**
+   * Qué pasa con los campos al guardar bien.
+   *
+   * "limpiar" en los formularios de alta. Antes se quedaban llenos, así que
+   * al capturar la segunda póliza aparecían los datos de la primera y no
+   * había manera de vaciarlos: parecía que el sistema no dejaba capturar de
+   * nuevo. "conservar" en los de edición, donde vaciar sería perder lo que
+   * se está viendo.
+   */
+  alGuardar?: "limpiar" | "conservar";
+  /** Botón para vaciar los campos en cualquier momento. */
+  limpiable?: boolean;
 }) {
   const [estado, ejecutar, enviando] = useActionState(accion, INICIAL);
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (estado.ok && alGuardar === "limpiar") form.current?.reset();
+  }, [estado, alGuardar]);
 
   return (
-    <form action={ejecutar} className="flex flex-col gap-4">
+    <form ref={form} action={ejecutar} className="flex flex-col gap-4">
       {ocultos &&
         Object.entries(ocultos).map(([k, v]) =>
           v ? <input key={k} type="hidden" name={k} value={v} /> : null,
@@ -89,13 +106,26 @@ export function Formulario({
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={enviando}
-        className="self-start rounded-md bg-tinta px-4 py-2.5 font-medium text-papel disabled:opacity-60"
-      >
-        {enviando ? "Guardando…" : boton}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={enviando}
+          className="rounded-md bg-tinta px-4 py-2.5 font-medium text-papel disabled:opacity-60"
+        >
+          {enviando ? "Guardando…" : boton}
+        </button>
+
+        {limpiable && (
+          <button
+            type="button"
+            onClick={() => form.current?.reset()}
+            disabled={enviando}
+            className="rounded-md border border-linea px-4 py-2.5 font-medium text-tinta-suave hover:text-tinta disabled:opacity-60"
+          >
+            Limpiar
+          </button>
+        )}
+      </div>
     </form>
   );
 }

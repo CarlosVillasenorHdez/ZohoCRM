@@ -15,7 +15,7 @@ export default async function NuevaPoliza({
   const sp = await searchParams;
 
   const [{ data: cs }, { data: asegs }] = await Promise.all([
-    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).order("nombre"),
+    supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).is("eliminado_en", null).order("nombre"),
     supabase.from("aseguradoras").select("id, nombre").eq("activa", true).order("orden"),
   ]);
 
