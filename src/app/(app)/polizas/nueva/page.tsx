@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { asesorActual, clienteServidor } from "@/lib/supabase/server";
-import { FormularioPoliza } from "./formulario";
+import { FormularioPoliza, type Origen } from "./formulario";
 
 export const dynamic = "force-dynamic";
 
 export default async function NuevaPoliza({
   searchParams,
 }: {
-  searchParams: Promise<{ contacto?: string }>;
+  searchParams: Promise<{ contacto?: string; oportunidad?: string }>;
 }) {
   const asesor = await asesorActual();
   if (!asesor) redirect("/login");
@@ -18,6 +18,33 @@ export default async function NuevaPoliza({
     supabase.from("contactos").select("id, nombre, apellido_paterno").eq("asesor_id", asesor.id).is("eliminado_en", null).order("nombre"),
     supabase.from("aseguradoras").select("id, nombre").eq("activa", true).order("orden"),
   ]);
+
+  // Si viene de una cotización ganada, se arrastran sus datos para no
+  // teclear dos veces lo que ya se capturó al cotizar.
+  let origen: Origen | null = null;
+  let contactoDeOrigen: string | null = null;
+  if (sp.oportunidad) {
+    const { data: o } = await supabase
+      .from("oportunidades")
+      .select("id, contacto_id, ramo, subtipo, datos, prima_cotizada, prima_estimada, forma_pago, vigencia_inicio")
+      .eq("id", sp.oportunidad)
+      .eq("asesor_id", asesor.id)
+      .is("eliminado_en", null)
+      .maybeSingle();
+
+    if (o) {
+      contactoDeOrigen = o.contacto_id;
+      origen = {
+        oportunidadId: o.id,
+        ramo: o.ramo,
+        subtipo: o.subtipo,
+        datos: (o.datos ?? {}) as Record<string, unknown>,
+        prima: o.prima_cotizada === null ? (o.prima_estimada === null ? null : Number(o.prima_estimada)) : Number(o.prima_cotizada),
+        formaPago: o.forma_pago,
+        vigenciaInicio: o.vigencia_inicio,
+      };
+    }
+  }
 
   const contactos = (cs ?? []).map((c) => ({
     id: c.id,
@@ -43,13 +70,16 @@ export default async function NuevaPoliza({
     <main>
       <h1 className="text-2xl font-semibold tracking-tight">Nueva póliza</h1>
       <p className="mt-1.5 max-w-prose text-tinta-suave">
-        Los recibos se generan solos según la forma de pago que elijas.
+        {origen
+          ? "Viene de una cotización ganada: los datos del riesgo ya están puestos, solo confirma el número de póliza y la vigencia."
+          : "Los recibos se generan solos según la forma de pago que elijas."}
       </p>
       <div className="mt-7 max-w-xl">
         <FormularioPoliza
           contactos={contactos}
           aseguradoras={asegs ?? []}
-          contactoPreseleccionado={sp.contacto ?? null}
+          contactoPreseleccionado={contactoDeOrigen ?? sp.contacto ?? null}
+          origen={origen}
         />
       </div>
     </main>
